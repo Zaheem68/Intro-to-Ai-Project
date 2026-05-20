@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>15-Queens (14x14) Interactive & Auto-Solver</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0f; --surface: #111318; --surface2: #181c24; --surface3: #1f2430;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0; --text2: #8b91a8; --text3: #555c72;
+    --accent: #6c8fff; --accent2: #3a5fe8;
+    --success: #3dd68c; --success-bg: rgba(61,214,140,0.1);
+    --error: #ff5f5f; --error-bg: rgba(255,95,95,0.1);
+    --warn: #f5a623; --warn-bg: rgba(245,166,35,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  
+  .logo { display: flex; align-items: center; gap: 10px; font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700; }
+  .logo-icon { font-size: 22px; filter: drop-shadow(0 0 8px rgba(108,143,255,0.6)); }
+  .logo span { color: var(--accent); }
+
+  main { flex: 1; display: grid; grid-template-columns: 1fr 340px; height: calc(100vh - 57px); overflow: hidden; }
+  .board-area { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 16px; }
+  .board-status-bar { width: 100%; max-width: 620px; display: flex; align-items: center; justify-content: space-between; }
+  
+  .status-pill { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 24px; font-size: 13px; font-weight: 500; border: 1px solid var(--border2); background: var(--surface2); transition: all 0.3s; }
+  .status-pill.running { border-color: rgba(108,143,255,0.4); color: var(--accent); background: rgba(108,143,255,0.08); }
+  .status-pill.failed { border-color: rgba(255,95,95,0.4); color: var(--error); background: var(--error-bg); }
+  .status-pill.manual { border-color: rgba(245,166,35,0.4); color: var(--warn); background: var(--warn-bg); }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .dot.pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+
+  .speed-control { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+  .speed-control input[type=range] { width: 80px; accent-color: var(--accent); cursor: pointer; }
+
+  #board-wrap { position: relative; flex-shrink: 0; }
+  canvas#board { border-radius: 8px; border: 1px solid var(--border2); box-shadow: 0 0 40px rgba(0,0,0,0.6); cursor: pointer; }
+
+  .sidebar { background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+  .sidebar-section { padding: 20px; border-bottom: 1px solid var(--border); }
+  .section-label { font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin-bottom: 14px; }
+
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .stat-val { font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .stat-val.accent { color: var(--accent); }
+  .stat-val.warn { color: var(--warn); }
+  .stat-label { font-size: 11px; color: var(--text3); font-weight: 500; }
+
+  .progress-wrap { margin-top: 12px; }
+  .progress-bar-bg { height: 4px; background: var(--surface3); border-radius: 4px; margin-top: 6px; overflow: hidden;}
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--warn), var(--error)); transition: width 0.2s; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 11px; font-family: 'Space Mono', monospace; color: var(--text3);}
+
+  .btn { width: 100%; padding: 11px 16px; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--accent2); color: white; }
+  .btn-warning { background: var(--warn); color: black; }
+  .btn-danger { background: var(--error-bg); color: var(--error); border: 1px solid rgba(255,95,95,0.2); }
+  .btn-group { display: flex; flex-direction: column; gap: 8px; }
+
+  .log-area { flex: 1; padding: 16px 20px; overflow-y: auto; min-height: 140px; }
+  .log-entry { display: flex; gap: 8px; padding: 5px 0; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .log-time { font-family: 'Space Mono', monospace; color: var(--text3); font-size: 10px; min-width: 36px; }
+  .log-msg { color: var(--text2); line-height: 1.4; }
+  .log-msg.err { color: var(--error); }
+  .log-msg.info { color: var(--accent); }
+  .log-msg.warn { color: var(--warn); }
+
+  .alert-banner { margin: 0 20px 12px; padding: 10px 14px; border-radius: 8px; font-size: 12px; display: none; }
+  .alert-banner.show { display: block; }
+  .alert-banner.error { background: var(--error-bg); border: 1px solid rgba(255,95,95,0.25); color: var(--error); }
+  .alert-banner.warn { background: var(--warn-bg); border: 1px solid rgba(245,166,35,0.25); color: var(--warn); }
+
+  @keyframes boardShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  .shake { animation: boardShake 0.4s ease; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">♛</span>
+    <span>14x14 <span>Algorithm & Sandbox Visualizer</span></span>
+  </div>
+</header>
+
+<main>
+  <div class="board-area">
+    <div class="board-status-bar">
+      <div class="status-pill idle" id="status-pill">
+        <div class="dot" id="status-dot"></div>
+        <span id="status-text">Click the board to place Queens, or start Auto-Run</span>
+      </div>
+      <div class="speed-control">
+        <span style="font-size:11px">Speed</span>
+        <input type="range" min="1" max="5" value="3" id="speed-slider">
+      </div>
+    </div>
+    <div id="board-wrap"><canvas id="board"></canvas></div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="section-label">Dashboard Metrics</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-val accent" id="sv-queens">0 / 15</div>
+          <div class="stat-label">Queens Placed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val warn" id="sv-time">0.00ms</div>
+          <div class="stat-label">Compute Time</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="sv-steps">0</div>
+          <div class="stat-label">Algorithmic Steps</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="sv-status">Ready</div>
+          <div class="stat-label">Engine Status</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>Target Progress</span><span id="prog-text">0 / 15</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="prog-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-label">Controls</div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-solve">▶ Auto Run Visualizer</button>
+        <button class="btn btn-warning" id="btn-instant">⚡ Instant Result</button>
+        <button class="btn btn-danger" id="btn-reset">↺ Reset Board</button>
+      </div>
+    </div>
+
+    <div class="alert-banner" id="alert-banner"></div>
+    <div class="log-area" id="log-area"></div>
+  </aside>
+</main>
+
+<script>
+const N = 14;
+const TARGET_QUEENS = 15;
+let CELL = 42;
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+
+let queens = [];
+let lockedInitialQueens = []; // User ki rakhi hui queens track karne ke liye
+let state = 'idle'; // 'idle', 'running', 'failed', 'manual'
+let stepsCount = 0;
+let solveSteps = [];
+let stepIdx = 0;
+let solveTimer = null;
+let computeTimeMs = 0;
+let hoverCell = null;
+
+function initBoard() {
+  const maxW = Math.min(window.innerWidth - 380, window.innerHeight - 120);
+  CELL = Math.max(28, Math.floor(maxW / (N)));
+  const size = CELL * N;
+  canvas.width = size; canvas.height = size;
+  drawBoard();
+}
+
+function cellColor(r, c) { return (r + c) % 2 === 0 ? '#1a2235' : '#131824'; }
+
+function getAttackedCells(currentQueens) {
+  const attacked = new Set();
+  for (const [qr, qc] of currentQueens) {
+    for (let c = 0; c < N; c++) if (c !== qc) attacked.add(`${qr},${c}`);
+    for (let r = 0; r < N; r++) if (r !== qr) attacked.add(`${r},${qc}`);
+    for (let d = -N; d <= N; d++) {
+      if (d === 0) continue;
+      const nr = qr + d, nc = qc + d;
+      if (nr >= 0 && nr < N && nc >= 0 && nc < N) attacked.add(`${nr},${nc}`);
+      const nr2 = qr + d, nc2 = qc - d;
+      if (nr2 >= 0 && nr2 < N && nc2 >= 0 && nc2 < N) attacked.add(`${nr2},${nc2}`);
+    }
+  }
+  return attacked;
+}
+
+// Validation Helper for manual clicks
+function checkAnyConflict(currentQueens) {
+  const attacked = getAttackedCells(currentQueens);
+  for (const [r, c] of currentQueens) {
+    if (attacked.has(`${r},${c}`)) return true;
+  }
+  return false;
+}
+
+function drawBoard(highlightCell = null, isError = false) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const attacked = getAttackedCells(queens);
+  
+  let hasConflicts = (state === 'manual' || state === 'idle') ? checkAnyConflict(queens) : false;
+
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const x = c * CELL, y = r * CELL;
+      ctx.fillStyle = cellColor(r, c);
+      ctx.fillRect(x, y, CELL, CELL);
+
+      if (isError && highlightCell && highlightCell[0] === r && highlightCell[1] === c) {
+        ctx.fillStyle = 'rgba(255,95,95,0.6)';
+        ctx.fillRect(x, y, CELL, CELL);
+      } else if (attacked.has(`${r},${c}`) && (isError || hasConflicts)) {
+        ctx.fillStyle = 'rgba(255,95,95,0.15)'; 
+        ctx.fillRect(x, y, CELL, CELL);
+      }
+
+      if (hoverCell && hoverCell[0] === r && hoverCell[1] === c && state !== 'running') {
+        ctx.fillStyle = 'rgba(108,143,255,0.2)';
+        ctx.fillRect(x, y, CELL, CELL);
+      }
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.strokeRect(x, y, CELL, CELL);
+    }
+  }
+
+  for (const [r, c] of queens) {
+    const x = c * CELL + CELL / 2, y = r * CELL + CELL / 2;
+    ctx.font = `bold ${CELL * 0.55}px serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    
+    // User ki locked queens ko alag color dena ho toh yahan logic daal sakte hain
+    const isLocked = lockedInitialQueens.some(q => q[0] === r && q[1] === c);
+    
+    if ((state === 'manual' || state === 'idle') && attacked.has(`${r},${c}`)) {
+      ctx.shadowColor = 'rgba(255,95,95,0.8)'; ctx.shadowBlur = 12;
+      ctx.fillStyle = '#ff5f5f';
+    } else if (isLocked && state === 'running') {
+      ctx.shadowColor = 'rgba(108,143,255,0.5)'; ctx.shadowBlur = 8;
+      ctx.fillStyle = '#8ba8ff'; // Blue color for manual locked queens
+    } else {
+      ctx.shadowColor = 'rgba(61,214,140,0.5)'; ctx.shadowBlur = 8;
+      ctx.fillStyle = '#3dd68c';
+    }
+    
+    ctx.fillText('♛', x, y + 1);
+    ctx.shadowBlur = 0;
+  }
+
+  if (highlightCell && !isError) {
+    const [r, c] = highlightCell;
+    ctx.fillStyle = 'rgba(108,143,255,0.3)';
+    ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+  }
+}
+
+// --- MOUSE CLICK LOGIC ---
+canvas.addEventListener('mousemove', (e) => {
+  if (state === 'running') return;
+  const rect = canvas.getBoundingClientRect();
+  const c = Math.floor(((e.clientX - rect.left) * (canvas.width / rect.width)) / CELL);
+  const r = Math.floor(((e.clientY - rect.top) * (canvas.height / rect.height)) / CELL);
+  
+  if (r >= 0 && r < N && c >= 0 && c < N) {
+    hoverCell = [r, c]; drawBoard();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => { hoverCell = null; drawBoard(); });
+
+canvas.addEventListener('click', (e) => {
+  if (state === 'running') return; 
+  
+  if (hoverCell) {
+    state = 'manual';
+    const [r, c] = hoverCell;
+    const existingIdx = queens.findIndex(q => q[0] === r && q[1] === c);
+    
+    if (existingIdx !== -1) {
+      queens.splice(existingIdx, 1);
+      logMsg(`Removed Queen at Row ${r+1}, Col ${String.fromCharCode(65+c)}`, 'warn');
+    } else {
+      if (queens.length < TARGET_QUEENS) {
+        queens.push([r, c]);
+        logMsg(`Placed Queen at Row ${r+1}, Col ${String.fromCharCode(65+c)}`, 'info');
+      } else {
+        showAlert('error', 'Board limit reached! Cannot place more than 15 Queens.');
+      }
+    }
+    
+    document.getElementById('status-pill').className = 'status-pill manual';
+    document.getElementById('status-text').textContent = 'Interactive Sandbox Mode';
+    document.getElementById('sv-status').textContent = 'Manual';
+    document.getElementById('alert-banner').className = 'alert-banner';
+    
+    stepsCount = 0;
+    document.getElementById('sv-steps').textContent = '0';
+    document.getElementById('sv-time').textContent = '0.00ms';
+    
+    updateUI(); drawBoard();
+  }
+});
+
+function isSafe(simBoard, r, c) {
+  for (let i = 0; i < N; i++) {
+    if (simBoard[i][c] && i !== r) return false;
+    if (simBoard[r][i] && i !== c) return false;
+  }
+  for (let d = 1; d < N; d++) {
+    if (r-d >= 0 && c-d >= 0 && simBoard[r-d][c-d]) return false;
+    if (r-d >= 0 && c+d < N && simBoard[r-d][c+d]) return false;
+    if (r+d < N && c-d >= 0 && simBoard[r+d][c-d]) return false;
+    if (r+d < N && c+d < N && simBoard[r+d][c+d]) return false;
+  }
+  return true;
+}
+
+function preCompute() {
+  solveSteps = [];
+  const simBoard = Array.from({length: N}, () => new Array(N).fill(0));
+  lockedInitialQueens = queens.map(q => [...q]); // Snapshot of user queens
+  const simQueens = [...lockedInitialQueens];
+  const lockedRows = new Set(lockedInitialQueens.map(q => q[0]));
+  
+  // Mark initial queens on the sim board
+  for(const [r, c] of lockedInitialQueens) { simBoard[r][c] = 1; }
+
+  let found14 = false;
+  const t0 = performance.now();
+
+  function bt(row) {
+    if (found14) return true; 
+
+    if (row === N) { 
+      found14 = true;
+      solveSteps.push({ type: 'placed_14', queensSnap: [...simQueens] });
+      
+      // Try 15th queen to show pigeonhole failure
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          solveSteps.push({ type: 'try_15', r, c, queensSnap: [...simQueens] });
+        }
+      }
+      solveSteps.push({ type: 'pigeonhole_fail' });
+      return true;
+    }
+
+    // Agar is row mein user ne pehle se queen rakhi hai, toh usay skip karo
+    if (lockedRows.has(row)) {
+      return bt(row + 1);
+    }
+
+    for (let col = 0; col < N; col++) {
+      solveSteps.push({ type: 'try', r: row, c: col, queensSnap: [...simQueens] });
+      if (isSafe(simBoard, row, col)) {
+        simBoard[row][col] = 1; simQueens.push([row, col]);
+        solveSteps.push({ type: 'place', r: row, c: col, queensSnap: [...simQueens] });
+        
+        if (bt(row + 1)) return true;
+        
+        simBoard[row][col] = 0; simQueens.pop();
+        solveSteps.push({ type: 'backtrack', r: row, c: col, queensSnap: [...simQueens] });
+      }
+    }
+    return false;
+  }
+
+  const success = bt(0);
+  if (!success) {
+      solveSteps.push({ type: 'unsolvable_manual' });
+  }
+
+  computeTimeMs = performance.now() - t0;
+  document.getElementById('sv-time').textContent = computeTimeMs.toFixed(2) + 'ms';
+}
+
+function processStep(step) {
+  stepsCount++;
+  document.getElementById('sv-steps').textContent = stepsCount;
+  
+  if (step.type === 'try' || step.type === 'place' || step.type === 'backtrack') {
+    queens = step.queensSnap;
+    drawBoard([step.r, step.c]);
+    updateUI();
+  } 
+  else if (step.type === 'placed_14') {
+    queens = step.queensSnap;
+    logMsg('14 Queens placed. Manual queens preserved. Attempting 15th Queen...', 'warn');
+  }
+  else if (step.type === 'try_15') {
+    queens = step.queensSnap;
+    drawBoard([step.r, step.c], true); 
+  }
+  else if (step.type === 'pigeonhole_fail') {
+    clearInterval(solveTimer);
+    state = 'failed';
+    document.getElementById('status-pill').className = 'status-pill failed';
+    document.getElementById('status-text').textContent = "Math Error: Pigeonhole Principle";
+    document.getElementById('board-wrap').classList.add('shake');
+    document.getElementById('sv-status').textContent = 'Failed';
+    
+    showAlert('error', 'CRITICAL: Cannot place 15 Queens on a 14x14 grid. 100% of cells are under attack!');
+    logMsg('Execution halted: Impossible configuration.', 'err');
+    drawBoard(null, true);
+  }
+  else if (step.type === 'unsolvable_manual') {
+    clearInterval(solveTimer);
+    state = 'failed';
+    document.getElementById('status-pill').className = 'status-pill failed';
+    document.getElementById('status-text').textContent = "Dead End";
+    document.getElementById('board-wrap').classList.add('shake');
+    document.getElementById('sv-status').textContent = 'Dead End';
+    
+    showAlert('warn', 'The queens you manually placed block the AI from finding ANY valid path to 14 queens. Try moving them!');
+    logMsg('Execution halted: Dead-end caused by manual placement.', 'err');
+    drawBoard();
+  }
+}
+
+function updateUI() {
+  document.getElementById('sv-queens').textContent = `${queens.length} / ${TARGET_QUEENS}`;
+  const pct = Math.round((queens.length / TARGET_QUEENS) * 100);
+  document.getElementById('prog-bar').style.width = pct + '%';
+  document.getElementById('prog-text').textContent = `${queens.length} / ${TARGET_QUEENS}`;
+}
+
+function logMsg(msg, type = '') {
+  const t = new Date().toISOString().substring(14, 21);
+  const area = document.getElementById('log-area');
+  area.insertAdjacentHTML('afterbegin', `<div class="log-entry"><span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span></div>`);
+}
+
+function showAlert(type, msg) {
+  const banner = document.getElementById('alert-banner');
+  banner.className = `alert-banner show ${type}`;
+  banner.textContent = msg;
+}
+
+document.getElementById('btn-solve').addEventListener('click', () => {
+  if (state === 'running') return;
+  
+  // Validation: Check if manual board is already invalid
+  if (checkAnyConflict(queens)) {
+      showAlert('error', 'Invalid setup! The queens you placed are attacking each other. Fix the red lines first.');
+      document.getElementById('board-wrap').classList.add('shake');
+      setTimeout(() => document.getElementById('board-wrap').classList.remove('shake'), 500);
+      return;
+  }
+
+  state = 'running';
+  document.getElementById('alert-banner').className = 'alert-banner';
+  document.getElementById('status-pill').className = 'status-pill running';
+  document.getElementById('status-text').textContent = 'Computing Algorithm (Locked Manual Queens)...';
+  document.getElementById('sv-status').textContent = 'Computing';
+  logMsg(`Started Algorithm. Locked ${queens.length} manual queens.`, 'info');
+  
+  preCompute();
+  
+  const speed = [0, 250, 100, 25, 2, 0][document.getElementById('speed-slider').value];
+  solveTimer = setInterval(() => {
+    if (stepIdx < solveSteps.length) processStep(solveSteps[stepIdx++]);
+    else clearInterval(solveTimer);
+  }, speed);
+});
+
+document.getElementById('btn-instant').addEventListener('click', () => {
+  if (state === 'running') clearInterval(solveTimer);
+  
+  if (checkAnyConflict(queens)) {
+      showAlert('error', 'Invalid setup! Fix the attacking queens first.');
+      return;
+  }
+
+  preCompute();
+  logMsg(`Instant Solve Used. Compute Time: ${computeTimeMs.toFixed(2)}ms`, 'warn');
+  
+  stepsCount = solveSteps.length;
+  document.getElementById('sv-steps').textContent = stepsCount;
+  
+  // Directly process the last relevant step
+  const lastStep = solveSteps[solveSteps.length-1];
+  if(lastStep.type === 'unsolvable_manual') {
+      processStep(lastStep);
+  } else {
+      queens = solveSteps[solveSteps.length-2].queensSnap; 
+      updateUI();
+      processStep({type: 'pigeonhole_fail'});
+  }
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  clearInterval(solveTimer);
+  queens = []; lockedInitialQueens = []; state = 'idle'; stepsCount = 0; solveSteps = []; stepIdx = 0;
+  
+  document.getElementById('status-pill').className = 'status-pill idle';
+  document.getElementById('status-text').textContent = 'Click the board to place Queens, or start Auto-Run';
+  document.getElementById('sv-status').textContent = 'Ready';
+  document.getElementById('sv-steps').textContent = '0';
+  document.getElementById('sv-time').textContent = '0.00ms';
+  document.getElementById('alert-banner').className = 'alert-banner';
+  
+  updateUI(); drawBoard();
+  logMsg('Board reset. Ready.', 'info');
+});
+
+initBoard();
+logMsg('System Initialized: Manual Queen Locking Enabled.', 'info');
+</script>
+</body>
+</html>
