@@ -377,7 +377,7 @@ async function fetchStepsFromPython() {
   document.getElementById('status-text').textContent = 'AI is Computing...';
   
   try {
-    const response = await fetch('/api/solve', {
+    const response = await fetch('https://zaheem68.pythonanywhere.com/api/solve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ n_grid: N_GRID, n_queens: N_QUEENS, queens: lockedInitialQueens })
